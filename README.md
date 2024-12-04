@@ -8,7 +8,7 @@
 * 注 此项目为依赖库，不具有完整端口扫描功能，仅作为指纹识别使用
 ## 功能特点
 
-- **协议识别**：`fingerscan` 能够识别端口上运行的协议类型，如TCP、UDP等。
+- **协议识别**：`fingerscan` 能够识别端口上运行的服务类型，如SSH、Mysql等。
 - **应用版本检测**：对于常见的应用服务，`fingerscan` 能够检测并显示其版本信息。
 - **用户友好的界面**：提供简洁明了的命令行界面，易于操作。
 - **跨平台支持**：作为Go语言编写的应用，`fingerscan` 支持跨平台运行，包括Windows、Linux和macOS。
@@ -16,6 +16,8 @@
 ## 运行
 
 要安装 `fingerscan`，请确保你的系统已经安装了Go语言环境。然后，你可以通过以下命令来安装：
+
+`go install github.com/yqcs/fingerscan@latest`
 
 运行方式：fingerscan qq.com 443
 
