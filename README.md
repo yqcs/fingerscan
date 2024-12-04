@@ -15,9 +15,7 @@
 
 ## 运行
 
-要安装 `fingerscan`，请确保你的系统已经安装了Go语言环境。然后，你可以通过以下命令来安装：
-
-`go install github.com/yqcs/fingerscan@latest`
+要安装 `fingerscan`，请确保你的系统已经安装了Go语言环境，以lib包的方式引入到自己的项目中。
 
 运行方式：fingerscan qq.com 443
 
