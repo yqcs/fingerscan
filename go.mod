@@ -1,4 +1,4 @@
-module fingerscan
+module github.com/yqcs/fingerscan
 
 go 1.23
 
