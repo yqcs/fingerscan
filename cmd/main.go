@@ -22,7 +22,7 @@ func main() {
 		fmt.Println("example: fingerscan 127.0.0.1 22")
 		return
 	}
-	result := fingerscan.ScanFingerprint(os.Args[1], port, 30*time.Second)
+	result := fingerscan.ScanFingerprint(os.Args[1], port, 20*time.Second)
 	//开始扫描
 	fmt.Println(result)
 }

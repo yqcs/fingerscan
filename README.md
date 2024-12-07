@@ -17,7 +17,12 @@
 
 要安装 `fingerscan`，请确保你的系统已经安装了Go语言环境，以lib包的方式引入到自己的项目中。
 
-运行方式：fingerscan qq.com 443
+速度越慢越精准，如果请根据场景调节适当的时间
+
+> fingerscan.ScanFingerprint(os.Args[1], port, 20*time.Second)
+> 
+
+运行方式：fingerscan exp.com 443
 
 <img src="img.png">
 

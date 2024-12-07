@@ -6,12 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="25f06f9e-a885-4965-a1a9-d3cd3c602488" name="更改" comment="Remove project name">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/customizeData.go" beforeDir="false" afterPath="$PROJECT_DIR$/customizeData.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/finger.go" beforeDir="false" afterPath="$PROJECT_DIR$/finger.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tcpFinger.go" beforeDir="false" afterPath="$PROJECT_DIR$/tcpFinger.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webFinger.go" beforeDir="false" afterPath="$PROJECT_DIR$/webFinger.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -115,7 +112,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1733553128457</updated>
-      <workItem from="1733553129740" duration="438000" />
+      <workItem from="1733553129740" duration="707000" />
     </task>
     <task id="LOCAL-00001" summary="Remove project name">
       <option name="closed" value="true" />
@@ -125,7 +122,15 @@
       <option name="project" value="LOCAL" />
       <updated>1733553257977</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Remove project name">
+      <option name="closed" value="true" />
+      <created>1733553639185</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1733553639185</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

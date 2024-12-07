@@ -88,7 +88,7 @@ func ScanFingerprint(ip string, port int, timeout time.Duration) *AppFinger {
 
 func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *AppFinger) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout*3)
 	defer cancel()
 
 	//第一步，先匹配匹配port指定端口的探针`
