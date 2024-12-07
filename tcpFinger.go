@@ -4,8 +4,8 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"encoding/pem"
-	netUtils2 "fingerscan/netUtils"
 	"fmt"
+	"github.com/yqcs/fingerscan/netUtils"
 	"net"
 	"net/http"
 	"regexp"
@@ -625,7 +625,7 @@ func (init *InitProbe) webFinger(target string, timeout time.Duration) *WebApp {
 
 	req.AddCookie(&http.Cookie{Name: "rememberMe", Value: RandomString(5)})
 
-	response, err := netUtils2.SendHttp(req, timeout, true)
+	response, err := netUtils.SendHttp(req, timeout, true)
 	if err != nil {
 		return nil
 	}
@@ -717,7 +717,7 @@ func (init *InitProbe) webFinger(target string, timeout time.Duration) *WebApp {
 	}
 
 	//获取ICON和Title
-	if scr := netUtils2.Scrape(response, timeout); scr != nil {
+	if scr := netUtils.Scrape(response, timeout); scr != nil {
 		res.Title = strings.ReplaceAll(scr.Title, "\r", " ")
 		res.Title = strings.ReplaceAll(scr.Title, "\n", " ")
 		res.Title = strings.ReplaceAll(scr.Title, "  ", " ")
