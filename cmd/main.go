@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/yqcs/fingerscan"
 	"os"
 	"strconv"
 	"time"
@@ -9,7 +10,7 @@ import (
 
 func init() {
 	//初始化指纹信息
-	InitFinger()
+	fingerscan.InitFinger()
 }
 func main() {
 	if len(os.Args) < 3 {
@@ -21,7 +22,7 @@ func main() {
 		fmt.Println("example: fingerscan 127.0.0.1 22")
 		return
 	}
-	result := ScanFingerprint(os.Args[1], port, 30*time.Second)
+	result := fingerscan.ScanFingerprint(os.Args[1], port, 30*time.Second)
 	//开始扫描
 	fmt.Println(result)
 }

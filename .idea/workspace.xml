@@ -4,11 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="25f06f9e-a885-4965-a1a9-d3cd3c602488" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+    <list default="true" id="25f06f9e-a885-4965-a1a9-d3cd3c602488" name="更改" comment="Remove project name">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/customizeData.go" beforeDir="false" afterPath="$PROJECT_DIR$/customizeData.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/finger.go" beforeDir="false" afterPath="$PROJECT_DIR$/finger.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/tcpFinger.go" beforeDir="false" afterPath="$PROJECT_DIR$/tcpFinger.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webFinger.go" beforeDir="false" afterPath="$PROJECT_DIR$/webFinger.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,6 +33,7 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "Go 构建.go build github.com/yqcs/fingerscan.executor": "Run",
+    "Go 构建.go build github.com/yqcs/fingerscan/cmd.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.go.formatter.settings.were.checked": "true",
@@ -37,11 +41,20 @@
     "go.import.settings.migrated": "true",
     "go.sdk.automatically.set": "true",
     "kotlin-language-version-configured": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
-  <component name="RunManager">
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\29326\Desktop\fingerscan\cmd" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Go 构建.go build github.com/yqcs/fingerscan/cmd">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="fingerscan" />
       <working_directory value="$PROJECT_DIR$" />
@@ -60,6 +73,15 @@
       <filePath value="$PROJECT_DIR$/main.go" />
       <method v="2" />
     </configuration>
+    <configuration name="go build github.com/yqcs/fingerscan/cmd" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
+      <module name="fingerscan" />
+      <working_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="github.com/yqcs/fingerscan/cmd" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$/cmd/main.go" />
+      <method v="2" />
+    </configuration>
     <configuration default="true" type="GoTestRunConfiguration" factoryName="Go Test">
       <module name="fingerscan" />
       <working_directory value="$PROJECT_DIR$" />
@@ -72,6 +94,7 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Go 构建.go build github.com/yqcs/fingerscan/cmd" />
         <item itemvalue="Go 构建.go build github.com/yqcs/fingerscan" />
       </list>
     </recent_temporary>
@@ -92,12 +115,25 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1733553128457</updated>
-      <workItem from="1733553129740" duration="44000" />
+      <workItem from="1733553129740" duration="438000" />
     </task>
+    <task id="LOCAL-00001" summary="Remove project name">
+      <option name="closed" value="true" />
+      <created>1733553257977</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1733553257977</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Remove project name" />
+    <option name="LAST_COMMIT_MESSAGE" value="Remove project name" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
