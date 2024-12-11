@@ -22,7 +22,13 @@ func main() {
 		fmt.Println("example: fingerscan 127.0.0.1 22")
 		return
 	}
+
 	result := fingerscan.ScanFingerprint(os.Args[1], port, 20*time.Second)
-	//开始扫描
-	fmt.Println(result)
+
+	fmt.Println("URI: ", result.Uri)
+	fmt.Println("Server: ", result.Service)
+	fmt.Println("WebFinger: ", result.WebApp.App)
+	fmt.Println("Web Title: ", result.WebApp.Title)
+	//fmt.Println("WebIcon: ", result.WebApp.Icon)
+	fmt.Println("SSL Cert: ", result.WebApp.Cert)
 }

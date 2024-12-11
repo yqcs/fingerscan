@@ -4,11 +4,11 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"github.com/yqcs/fingerscan/utils/arr"
 	"net"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 var (
@@ -69,26 +69,12 @@ func ScanFingerprint(ip string, port int, timeout time.Duration) *AppFinger {
 	finger.IP = ip
 	finger.Port = port
 
-	//web响应大于500k则不保存
-	if utf8.RuneCountInString(string(finger.Response)) > 500*1024 {
-		finger.Response = []byte("The data is too large to display, please visit the URL yourself.")
-	}
-	if finger.Version.VendorProductName != "unknown" {
-		//移除重复
-		finger.WebApp.App = DeleteSliceValueToLower(finger.WebApp.App, finger.Version.VendorProductName)
-		//如果检测到了version，将其拼接进appName里，组成 nginx 1.18.2
-		if finger.Version.Version != "unknown" {
-			finger.WebApp.App = append(finger.WebApp.App, finger.Version.VendorProductName+" "+finger.Version.Version)
-		} else {
-			finger.WebApp.App = append(finger.WebApp.App, finger.Version.VendorProductName)
-		}
-	}
 	return finger
 }
 
 func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *AppFinger) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*3)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	//第一步，先匹配匹配port指定端口的探针`
@@ -96,7 +82,7 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 		if ctx.Err() != nil {
 			return
 		}
-		if ((item.ProbeName != "NULL" && (!IntSliceContains(item.Ports, port) || item.Rarity > 7)) && !ssl) || item.Protocol == "UDP" {
+		if ((item.ProbeName != "NULL" && (!arr.IntSliceContains(item.Ports, port) || item.Rarity > 7)) && !ssl) || item.Protocol == "UDP" {
 			continue
 		}
 		if finger = initProbe.regxResponse(ip, port, item, ssl); finger != nil {
@@ -111,7 +97,7 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 			return
 		}
 		//是否ssl检测
-		if !IntSliceContains(item.SSLPorts, port) || item.Rarity > 7 {
+		if !arr.IntSliceContains(item.SSLPorts, port) || item.Rarity > 7 {
 			continue
 		}
 		if finger = initProbe.regxResponse(ip, port, item, true); finger != nil {
@@ -126,7 +112,7 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 			return
 		}
 		//过滤以下探针：包含port/sslPort、Name = NULL
-		if item.ProbeName == "NULL" || IntSliceContains(item.Ports, port) || IntSliceContains(item.SSLPorts, port) || item.Protocol == "UDP" || item.Rarity > 7 {
+		if item.ProbeName == "NULL" || arr.IntSliceContains(item.Ports, port) || arr.IntSliceContains(item.SSLPorts, port) || item.Protocol == "UDP" || item.Rarity > 7 {
 			continue
 		}
 		//检测
@@ -148,6 +134,24 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 			return
 		}
 		time.Sleep(time.Duration(item.TcpWrappedMS) * time.Millisecond)
+	}
+	return
+}
+
+// GetWebAppList 获取全部WebApp列表
+func GetWebAppList() (list []string) {
+	for k, _ := range initProbe.wappalyze.Apps {
+		if k != "" {
+			list = append(list, k)
+		}
+	}
+	return
+}
+func GetNmapAppList() (list []string) {
+	for _, item := range initProbe.probeList {
+		for _, subItem := range item.Matches {
+			list = append(list, subItem.Service)
+		}
 	}
 	return
 }

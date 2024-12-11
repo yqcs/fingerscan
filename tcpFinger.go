@@ -5,7 +5,10 @@ import (
 	"crypto/tls"
 	"encoding/pem"
 	"fmt"
-	"github.com/yqcs/fingerscan/netUtils"
+	"github.com/yqcs/fingerscan/utils/arr"
+	"github.com/yqcs/fingerscan/utils/netUtils"
+	"github.com/yqcs/fingerscan/utils/parse"
+	"github.com/yqcs/fingerscan/utils/randomUtils"
 	"net"
 	"net/http"
 	"regexp"
@@ -95,11 +98,79 @@ type AppFinger struct {
 }
 
 func (init *InitProbe) initNmap() {
+	//解析探针
 	nmapServiceProbes, _ := temp.ReadFile("data/nmap-service-probes")
 	data := string(nmapServiceProbes) + customizeProbes
+
+	data = strings.ReplaceAll(data, `\1`, `$1`)
+	data = strings.ReplaceAll(data, `(?=\\)`, `(?:\\)`)
+	data = strings.ReplaceAll(data, `(?=[\w._-]{5,15}\r?\n$)`, `(?:[\w._-]{5,15}\r?\n$)`)
+	data = strings.ReplaceAll(data, `(?:[^\r\n]*r\n(?!\r\n))*?`, `(?:[^\r\n]+\r\n)*?`)
+	data = strings.ReplaceAll(data, `(?:[^\r\n]*\r\n(?!\r\n))*?`, `(?:[^\r\n]+\r\n)*?`)
+	data = strings.ReplaceAll(data, `(?:[^\r\n]+\r\n(?!\r\n))*?`, `(?:[^\r\n]+\r\n)*?`)
+	data = strings.ReplaceAll(data, `(?!2526)`, ``)
+	data = strings.ReplaceAll(data, `(?!400)`, ``)
+	data = strings.ReplaceAll(data, `(?!\0\0)`, ``)
+	data = strings.ReplaceAll(data, `(?!/head>)`, ``)
+	data = strings.ReplaceAll(data, `(?!HTTP|RTSP|SIP)`, ``)
+	data = strings.ReplaceAll(data, `(?!.*[sS][sS][hH]).*`, `.*`)
+	data = strings.ReplaceAll(data, `(?!\xff)`, `.`)
+	data = strings.ReplaceAll(data, `(?!x)`, `[^x]`)
+	data = strings.ReplaceAll(data, `(?<=.)`, `(?:.)`)
+	data = strings.ReplaceAll(data, `(?<=\?)`, `(?:\?)`)
+	data = strings.ReplaceAll(data, `\x20\x02\x00.`, `\x20\x02..`)
+	data = strings.ReplaceAll(data, `nmap`, randomUtils.RandomString(4)) //移除nmap指纹
+	data = strings.ReplaceAll(data, `Nmap`, randomUtils.RandomString(4)) //移除nmap指纹
+
 	init.parseProbe(strings.Split(data, "\n"))
+
+	//解析端口
 	nmapServicesPort, _ := temp.ReadFile("data/nmap-services")
 	init.parsePort(strings.Split(string(nmapServicesPort), "\n"))
+
+	//添加自定义规则  单独的匹配语句必须要以|结尾
+	// 单独的匹配语句必须要以|结尾
+	init.addProbe("GetRequest", `match https m|^Client sent an HTTP request to an HTTPS server.|`)
+	init.addProbe("GetRequest", `match https m|^Reason: You're speaking plain HTTP to an SSL-enabled server port.|`)
+	init.addProbe("GetRequest", `match https m|This combination of host and port requires TLS|`)
+	init.addProbe("GetRequest", `match http m|^HTTP/1\.[01] \d\d\d|`)
+	init.addProbe("GetRequest", `match echo m|^GET / HTTP/1.0\r\n\r\n$|s`)
+	init.addProbe("GetRequest", `match ssl/http m|^This combination of host and port requires TLS.|`)
+	init.addProbe("GetRequest", `match ssl/http m|^HTTP/1\.[01] 400 Bad Request\n\nClient sent an HTTP request to an HTTPS server.|`)
+	init.addProbe("GetRequest", `match mongodb m|.*It looks like you are trying to access MongoDB.*|s p/MongoDB/`)
+	init.addProbe("GetRequest", `match http m|^HTTP/1\.[01] \d\d\d (?:[^\r\n]+\r\n)*?Server: ([^\r\n]+)| p/$1/`)
+	init.addProbe("GetRequest", `match ssl/http m|400 The plain HTTP request was sent to HTTPS port|s p/nginx/ v/$1/ cpe:/a:igor_sysoev:nginx:$1/`)
+	init.addProbe("NULL", `match telnet m|^.*Welcome to visit (.*) series router!.*|s p/$1 Router/`)
+	init.addProbe("NULL", `match telnet m|^Username: ??|`)
+	init.addProbe("NULL", `match telnet m|^.*Telnet service is disabled or Your telnet session has expired due to inactivity.*|s i/Disabled/`)
+	init.addProbe("NULL", `match telnet m|^.*Telnet connection from (.*) refused.*|s i/Refused/`)
+	init.addProbe("NULL", `match telnet m|^.*Command line is locked now, please retry later.*\x0d\x0a\x0d\x0a|s i/Locked/`)
+	init.addProbe("NULL", `match telnet m|^.*Warning: Telnet is not a secure protocol, and it is recommended to use Stelnet.*|s`)
+	init.addProbe("NULL", `match telnet m|^telnetd:|s`)
+	init.addProbe("NULL", `match telnet m|^.*Quopin CLI for (.*)\x0d\x0a\x0d\x0a|s p/$1/`)
+	init.addProbe("NULL", `match telnet m|^\x0d\x0aHello, this is FRRouting \(version ([\d.]+)\).*|s p/FRRouting/ v/$1/`)
+	init.addProbe("NULL", `match telnet m|^.*User Access Verification.*Username:|s`)
+	init.addProbe("NULL", `match telnet m|^Connection failed.  Windows CE Telnet Service cannot accept anymore concurrent users.|s o/Windows/`)
+	init.addProbe("NULL", `match telnet m|^\x0d\x0a\x0d\x0aWelcome to the host.\x0d\x0a.*|s o/Windows/`)
+	init.addProbe("NULL", `match telnet m|^.*Welcome Visiting Huawei Home Gateway\x0d\x0aCopyright by Huawei Technologies Co., Ltd.*Login:|s p/Huawei/`)
+	init.addProbe("NULL", `match telnet m|^..\x01..\x03..\x18..\x1f|s p/Huawei/`)
+	init.addProbe("NULL", `match smtp m|^220 ([a-z0-1.-]+).*| h/$1/`)
+	init.addProbe("NULL", `match ftp m|^421[- ]Service not available..*|`)
+	init.addProbe("NULL", `match ftp m|^220[- ].*filezilla.*|i p/FileZilla/`)
+	init.addProbe("NULL", `match ssh m|^SSH-2.0-OpenSSH|`)
+	init.addProbe("NULL", `match mysql m|.\x00\x00..j\x04Host '.*' is not allowed to connect to this MariaDB server| p/MariaDB/`)
+	init.addProbe("NULL", `match mysql m|.\x00\x00..j\x04Host '.*' is not allowed to connect to this MySQL server| p/MySQL/`)
+	init.addProbe("NULL", `match mysql m|.\x00\x00\x00\x0a(\d+\.\d+\.\d+)\x00.*caching_sha2_password\x00| p/MariaDB/ v/$1/`)
+	init.addProbe("NULL", `match mysql m|.\x00\x00\x00\x0a([\d.-]+)-MariaDB\x00.*mysql_native_password\x00| p/MariaDB/ v/$1/`)
+	init.addProbe("NULL", `match ftp m|^220 H3C Small-FTP Server Version ([\d.]+).* | p/H3C Small-FTP/ v/$1/`)
+	init.addProbe("NULL", `match ssh m|SSH-2.0-OpenSSH_7.4| p/SSH2_OpenSSH/ v/7.4/`)
+	init.addProbe("redis-server", `match redis m|^-NOAUTH Authentication required.|s p/Redis key-value store/`)
+	init.addProbe("redis-server", `match redis m|-DENIED Redis is running in.*| p/Redis/ i/Protected mode/`)
+	init.addProbe("redis-server", `match redis m|^.*redis_version:([.\d]+)\n|s p/Redis key-value store/ v/$1/ cpe:/a:redislabs:redis:$1/`)
+	init.addProbe("redis-server", `redis m|^-NOAUTH Authentication required.|s p/Redis key-value store/`)
+	init.addProbe("SMBProgNeg", `match postgresql m|Munsupported frontend protocol| p/PostgreSQL DB/ v/13.x / cpe:/a:postgresql:postgresql:13/`)
+	init.addProbe("SMBProgNeg", `match postgresql m|pginstaller_13.auto| p/PostgreSQL DB/ v/13.x / cpe:/a:postgresql:postgresql:13/`)
+	init.addProbe("TerminalServerCookie", `match ms-wbt-server m|^\x03\0\0\x13\x0e\xd0\0\0\x124\0\x02.*\0\x02\0\0\0| p/Microsoft Terminal Services/ o/Windows/ cpe:/o:microsoft:windows/a`)
 }
 
 // regxResponse 解析响应
@@ -135,7 +206,7 @@ func (init *InitProbe) regxResponse(ip string, port int, probe Probe, ssl bool) 
 			continue
 		}
 		//转义response
-		data := ConvResponse(response)
+		data := arr.ConvResponse(response)
 		//进行硬匹配和软匹配
 		if reg := init.getPatternRegexp(item.Pattern, item.PatternFlag); reg != nil && reg.MatchString(data) {
 			if finger == nil {
@@ -164,7 +235,7 @@ func (init *InitProbe) regxResponse(ip string, port int, probe Probe, ssl bool) 
 				continue
 			}
 			//转义response
-			data := ConvResponse(response)
+			data := arr.ConvResponse(response)
 			//进行硬匹配和软匹配
 			if reg := init.getPatternRegexp(subItem.Pattern, subItem.PatternFlag); reg != nil && reg.MatchString(data) {
 				if finger == nil {
@@ -200,7 +271,7 @@ func (init *InitProbe) regxResponse(ip string, port int, probe Probe, ssl bool) 
 					continue
 				}
 				//转义response
-				data := ConvResponse(response)
+				data := arr.ConvResponse(response)
 				//进行硬匹配和软匹配
 				if reg := init.getPatternRegexp(item.Pattern, item.PatternFlag); reg != nil && reg.MatchString(data) {
 					if finger == nil {
@@ -346,11 +417,11 @@ func (init *InitProbe) parseProbe(list []string) (probe Probe) {
 		}
 		if strings.HasPrefix(line, "ports ") {
 			slice := strings.Split(line, " ")
-			probe.Ports = ParsePort(slice[1])
+			probe.Ports = parse.ParsePort(slice[1])
 		}
 		if strings.HasPrefix(line, "sslports ") {
 			slice := strings.Split(line, " ")
-			probe.SSLPorts = ParsePort(slice[1])
+			probe.SSLPorts = parse.ParsePort(slice[1])
 		}
 		if strings.HasPrefix(line, "totalwaitms ") {
 			slice := strings.Split(line, " ")
@@ -623,7 +694,7 @@ func (init *InitProbe) webFinger(target string, timeout time.Duration) *WebApp {
 
 	req, _ := http.NewRequest("GET", target, nil)
 
-	req.AddCookie(&http.Cookie{Name: "rememberMe", Value: RandomString(5)})
+	req.AddCookie(&http.Cookie{Name: "rememberMe", Value: randomUtils.RandomString(5)})
 
 	response, err := netUtils.SendHttp(req, timeout, true)
 	if err != nil {
@@ -643,7 +714,7 @@ func (init *InitProbe) webFinger(target string, timeout time.Duration) *WebApp {
 	}
 
 	if len(res.App) > 0 {
-		res.App = SliceRemoveDuplicates(res.App)
+		res.App = arr.SliceRemoveDuplicates(res.App)
 		sort.Strings(res.App)
 	}
 
