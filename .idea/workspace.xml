@@ -5,21 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="25f06f9e-a885-4965-a1a9-d3cd3c602488" name="更改" comment="Remove project name">
-      <change afterPath="$PROJECT_DIR$/utils/arr/utils.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils/parse/ParseIP.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils/parse/parsePort.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils/randomUtils/codec.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils/randomUtils/generator.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils/randomUtils/rand.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/utils/randomUtils/uuid.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/finger.go" beforeDir="false" afterPath="$PROJECT_DIR$/finger.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/netUtils/body.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils/netUtils/body.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/netUtils/scraper.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils/netUtils/scraper.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/netUtils/tcp.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils/netUtils/tcp.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tcpFinger.go" beforeDir="false" afterPath="$PROJECT_DIR$/tcpFinger.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/nmap-service-probes" beforeDir="false" afterPath="$PROJECT_DIR$/data/nmap-service-probes" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/nmap-services" beforeDir="false" afterPath="$PROJECT_DIR$/data/nmap-services" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -49,7 +40,7 @@
     "go.import.settings.migrated": "true",
     "go.sdk.automatically.set": "true",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/29326/Desktop/fingerscan/utils",
+    "last_opened_file_path": "C:/Users/29326/Desktop/fingerscan/data",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -60,6 +51,7 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\29326\Desktop\fingerscan\data" />
       <recent name="C:\Users\29326\Desktop\fingerscan\utils" />
       <recent name="C:\Users\29326\Desktop\fingerscan" />
     </key>
@@ -90,7 +82,7 @@
     <configuration name="go build github.com/yqcs/fingerscan/cmd" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
       <module name="fingerscan" />
       <working_directory value="$PROJECT_DIR$" />
-      <parameters value="prismx.io 443" />
+      <parameters value="qq.com 443" />
       <kind value="PACKAGE" />
       <package value="github.com/yqcs/fingerscan/cmd" />
       <directory value="$PROJECT_DIR$" />
@@ -121,8 +113,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-fdfe4dae3a2d-intellij.indexing.shared.core-IU-243.22562.145" />
-        <option value="bundled-js-predefined-d6986cc7102b-deb605915726-JavaScript-IU-243.22562.145" />
+        <option value="bundled-jdk-9823dce3aa75-fdfe4dae3a2d-intellij.indexing.shared.core-IU-243.22562.218" />
+        <option value="bundled-js-predefined-d6986cc7102b-deb605915726-JavaScript-IU-243.22562.218" />
       </set>
     </attachedChunks>
   </component>
@@ -136,6 +128,7 @@
       <updated>1733553128457</updated>
       <workItem from="1733553129740" duration="707000" />
       <workItem from="1733886341293" duration="812000" />
+      <workItem from="1735892720572" duration="657000" />
     </task>
     <task id="LOCAL-00001" summary="Remove project name">
       <option name="closed" value="true" />
@@ -165,5 +158,26 @@
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/tcpFinger.go</url>
+          <line>122</line>
+          <option name="timeStamp" value="4" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/tcpFinger.go</url>
+          <line>449</line>
+          <option name="timeStamp" value="5" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/finger.go</url>
+          <line>22</line>
+          <option name="timeStamp" value="6" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

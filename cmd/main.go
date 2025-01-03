@@ -13,6 +13,7 @@ func init() {
 	fingerscan.InitFinger()
 }
 func main() {
+
 	if len(os.Args) < 3 {
 		fmt.Println("example: fingerscan 127.0.0.1 22")
 		return
