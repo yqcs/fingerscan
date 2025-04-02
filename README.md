@@ -1,6 +1,5 @@
-# Fingerscan - Golang 端口指纹识别依赖库
+# Fingerscan - Golang 端口指纹识别库
 
-### 此说明由大模型生成
 
 ## 简介
 
