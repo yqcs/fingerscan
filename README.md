@@ -1,4 +1,4 @@
-# Fingerscan - Golang 端口指纹识别库
+# Fingerscan - Golang 端口指纹识别库，Nmap的Golang实现
 
 
 ## 简介
