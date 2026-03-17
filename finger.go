@@ -4,11 +4,12 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/yqcs/fingerscan/utils/arr"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yqcs/fingerscan/utils/arr"
 )
 
 var (
@@ -77,7 +78,10 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	//第一步，先匹配匹配port指定端口的探针`
+	//已检测过的探针黑名单，避免后续步骤重复探测
+	checked := make(map[string]struct{})
+
+	//第一步，先匹配匹配port指定端口的探针
 	for _, item := range initProbe.probeList {
 		if ctx.Err() != nil {
 			return
@@ -85,10 +89,15 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 		if ((item.ProbeName != "NULL" && (!arr.IntSliceContains(item.Ports, port) || item.Rarity > 7)) && !ssl) || item.Protocol == "UDP" {
 			continue
 		}
-		if finger = initProbe.regxResponse(ip, port, item, ssl); finger != nil {
+		checked[item.ProbeName] = struct{}{}
+		if finger = initProbe.regxResponse(ctx, ip, port, item, ssl); finger != nil {
 			return
 		}
-		time.Sleep(time.Duration(item.TcpWrappedMS) * time.Millisecond)
+	}
+
+	//ssl模式下第一步已遍历所有TCP探针，无需重复执行后续步骤
+	if ssl {
+		return
 	}
 
 	//第二步，匹配sslPort指定端口的探针
@@ -96,14 +105,16 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 		if ctx.Err() != nil {
 			return
 		}
-		//是否ssl检测
 		if !arr.IntSliceContains(item.SSLPorts, port) || item.Rarity > 7 {
 			continue
 		}
-		if finger = initProbe.regxResponse(ip, port, item, true); finger != nil {
+		if _, ok := checked[item.ProbeName]; ok {
+			continue
+		}
+		checked[item.ProbeName] = struct{}{}
+		if finger = initProbe.regxResponse(ctx, ip, port, item, true); finger != nil {
 			return
 		}
-		time.Sleep(time.Duration(item.TcpWrappedMS) * time.Millisecond)
 
 	}
 	//第三步，依次从低到高进行匹配TCP
@@ -111,15 +122,16 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 		if ctx.Err() != nil {
 			return
 		}
-		//过滤以下探针：包含port/sslPort、Name = NULL
-		if item.ProbeName == "NULL" || arr.IntSliceContains(item.Ports, port) || arr.IntSliceContains(item.SSLPorts, port) || item.Protocol == "UDP" || item.Rarity > 7 {
+		if item.ProbeName == "NULL" || item.Protocol == "UDP" || item.Rarity > 7 {
 			continue
 		}
-		//检测
-		if finger = initProbe.regxResponse(ip, port, item, ssl); finger != nil {
+		if _, ok := checked[item.ProbeName]; ok {
+			continue
+		}
+		checked[item.ProbeName] = struct{}{}
+		if finger = initProbe.regxResponse(ctx, ip, port, item, ssl); finger != nil {
 			return
 		}
-		time.Sleep(time.Duration(item.TcpWrappedMS) * time.Millisecond)
 
 	}
 	//第四步，匹配全部UDP
@@ -130,10 +142,12 @@ func probeCheck(ip string, port int, ssl bool, timeout time.Duration) (finger *A
 		if item.Protocol == "TCP" {
 			continue
 		}
-		if finger = initProbe.regxResponse(ip, port, item, ssl); finger != nil {
+		if _, ok := checked[item.ProbeName]; ok {
+			continue
+		}
+		if finger = initProbe.regxResponse(ctx, ip, port, item, ssl); finger != nil {
 			return
 		}
-		time.Sleep(time.Duration(item.TcpWrappedMS) * time.Millisecond)
 	}
 	return
 }

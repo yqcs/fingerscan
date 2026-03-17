@@ -80,7 +80,7 @@ func Scrape(resp Result, timeout time.Duration) *DocumentPreview {
 	if err != nil {
 		return &doc
 	}
-	sendHttp, err := SendHttp(request, timeout, true)
+	sendHttp, err := SendHttp(request, timeout)
 	if err != nil {
 		return &doc
 	}

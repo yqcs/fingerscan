@@ -21,6 +21,12 @@ type Fingerprint struct {
 	Script  []string            `json:"scripts"`
 	Meta    map[string][]string `json:"meta"`
 	Implies []string            `json:"implies"`
+	// Precompiled patterns
+	CompiledCookies map[string]*regexp.Regexp
+	CompiledHeaders map[string]*regexp.Regexp
+	CompiledHTML    []*regexp.Regexp
+	CompiledScript  []*regexp.Regexp
+	CompiledMeta    map[string][]*regexp.Regexp
 }
 
 // part is the part of the fingerprint to match
@@ -42,28 +48,25 @@ func (s *Wappalyze) matchString(data string, part part) []string {
 	var technologies []string
 
 	for app, fingerprint := range s.Apps {
-
 		switch part {
 		case scriptPart:
-			for _, pattern := range fingerprint.Script {
-				if reg, err := regexp.Compile(pattern); err == nil && reg.MatchString(data) {
+			for _, reg := range fingerprint.CompiledScript {
+				if reg != nil && reg.MatchString(data) {
 					matched = true
 				}
 			}
 		case htmlPart:
-			for _, pattern := range fingerprint.HTML {
-				if reg, err := regexp.Compile(pattern); err == nil && reg.MatchString(data) {
+			for _, reg := range fingerprint.CompiledHTML {
+				if reg != nil && reg.MatchString(data) {
 					matched = true
 				}
 			}
 		}
 
-		//如果不匹配，循环下一个指纹
 		if !matched {
 			continue
 		}
 
-		//匹配就添加进去技术组里
 		technologies = append(technologies, app)
 		if len(fingerprint.Implies) > 0 {
 			technologies = append(technologies, fingerprint.Implies...)
@@ -81,32 +84,17 @@ func (s *Wappalyze) matchKeyValueString(key, value string, part part) []string {
 	for app, fingerprint := range s.Apps {
 		switch part {
 		case cookiesPart:
-			for data, pattern := range fingerprint.Cookies {
-				if data != key {
-					continue
-				}
-				if reg, err := regexp.Compile(pattern); err == nil && reg.MatchString(value) {
-					matched = true
-					break
-				}
+			if reg, ok := fingerprint.CompiledCookies[key]; ok && reg != nil && reg.MatchString(value) {
+				matched = true
 			}
 		case headersPart:
-			for data, pattern := range fingerprint.Headers {
-				if data != key {
-					continue
-				}
-				if reg, err := regexp.Compile(pattern); err == nil && reg.MatchString(value) {
-					matched = true
-					break
-				}
+			if reg, ok := fingerprint.CompiledHeaders[key]; ok && reg != nil && reg.MatchString(value) {
+				matched = true
 			}
 		case metaPart:
-			for data, patterns := range fingerprint.Meta {
-				if data != key {
-					continue
-				}
-				for _, pattern := range patterns {
-					if reg, err := regexp.Compile(pattern); err == nil && reg.MatchString(value) {
+			if regList, ok := fingerprint.CompiledMeta[key]; ok {
+				for _, reg := range regList {
+					if reg != nil && reg.MatchString(value) {
 						matched = true
 						break
 					}
@@ -131,37 +119,27 @@ func (s *Wappalyze) matchMapString(keyValue map[string]string, part part) []stri
 	for app, fingerprint := range s.Apps {
 		switch part {
 		case cookiesPart:
-			for data, pattern := range fingerprint.Cookies {
-				value, ok := keyValue[data]
-				if !ok {
-					continue
-				}
-				if reg, err := regexp.Compile(pattern); err == nil && reg.MatchString(value) {
+			for key, reg := range fingerprint.CompiledCookies {
+				if value, ok := keyValue[key]; ok && reg != nil && reg.MatchString(value) {
 					matched = true
 					break
 				}
 			}
 		case headersPart:
-			for data, pattern := range fingerprint.Headers {
-				value, ok := keyValue[strings.ToLower(data)]
-				if !ok {
-					continue
-				}
-				if reg, err := regexp.Compile(pattern); err == nil && reg.MatchString(value) {
+			for key, reg := range fingerprint.CompiledHeaders {
+				if value, ok := keyValue[strings.ToLower(key)]; ok && reg != nil && reg.MatchString(value) {
 					matched = true
 					break
 				}
 			}
 		case metaPart:
-			for data, patterns := range fingerprint.Meta {
-				value, ok := keyValue[data]
-				if !ok {
-					continue
-				}
-				for _, pattern := range patterns {
-					if reg, err := regexp.Compile(pattern); err == nil && reg.MatchString(value) {
-						matched = true
-						break
+			for key, regList := range fingerprint.CompiledMeta {
+				if value, ok := keyValue[key]; ok {
+					for _, reg := range regList {
+						if reg != nil && reg.MatchString(value) {
+							matched = true
+							break
+						}
 					}
 				}
 			}
@@ -311,6 +289,43 @@ func (init *InitProbe) initWappalyze() {
 	}
 }
 
+func stripVersionSuffix(pattern string) string {
+	if idx := strings.Index(pattern, `\;version:`); idx != -1 {
+		return pattern[:idx]
+	}
+	return pattern
+}
+
+func compilePatternMap(patterns map[string]string) map[string]*regexp.Regexp {
+	compiled := make(map[string]*regexp.Regexp, len(patterns))
+	for key, pattern := range patterns {
+		pattern = stripVersionSuffix(pattern)
+		if reg, err := regexp.Compile(pattern); err == nil {
+			compiled[key] = reg
+		}
+	}
+	return compiled
+}
+
+func compilePatternSlice(patterns []string) []*regexp.Regexp {
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	for _, pattern := range patterns {
+		pattern = stripVersionSuffix(pattern)
+		if reg, err := regexp.Compile(pattern); err == nil {
+			compiled = append(compiled, reg)
+		}
+	}
+	return compiled
+}
+
+func compilePatternMapSlice(patterns map[string][]string) map[string][]*regexp.Regexp {
+	compiled := make(map[string][]*regexp.Regexp, len(patterns))
+	for key, patternList := range patterns {
+		compiled[key] = compilePatternSlice(patternList)
+	}
+	return compiled
+}
+
 func (s *Wappalyze) loadFingerprints() error {
 	fingerprintsStruct := Wappalyze{}
 	data, _ := temp.ReadFile("data/web-finger.json")
@@ -320,6 +335,11 @@ func (s *Wappalyze) loadFingerprints() error {
 	}
 	for i, fingerprint := range fingerprintsStruct.Apps {
 		s.Apps[i] = fingerprint
+		s.Apps[i].CompiledCookies = compilePatternMap(fingerprint.Cookies)
+		s.Apps[i].CompiledHeaders = compilePatternMap(fingerprint.Headers)
+		s.Apps[i].CompiledHTML = compilePatternSlice(fingerprint.HTML)
+		s.Apps[i].CompiledScript = compilePatternSlice(fingerprint.Script)
+		s.Apps[i].CompiledMeta = compilePatternMapSlice(fingerprint.Meta)
 	}
 	return nil
 }

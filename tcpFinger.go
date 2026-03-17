@@ -1,14 +1,10 @@
 package fingerscan
 
 import (
+	"context"
 	"crypto/rsa"
-	"crypto/tls"
 	"encoding/pem"
 	"fmt"
-	"github.com/yqcs/fingerscan/utils/arr"
-	"github.com/yqcs/fingerscan/utils/netUtils"
-	"github.com/yqcs/fingerscan/utils/parse"
-	"github.com/yqcs/fingerscan/utils/randomUtils"
 	"net"
 	"net/http"
 	"regexp"
@@ -16,11 +12,17 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yqcs/fingerscan/utils/arr"
+	"github.com/yqcs/fingerscan/utils/netUtils"
+	"github.com/yqcs/fingerscan/utils/parse"
+	"github.com/yqcs/fingerscan/utils/randomUtils"
 )
 
 type InitProbe struct {
-	wappalyze  Wappalyze //wappalyze指纹数据
-	probeList  []Probe   //nmap探针数据
+	wappalyze  Wappalyze         //wappalyze指纹数据
+	probeList  []Probe           //nmap探针数据
+	probeMap   map[string]*Probe //探针名到探针的索引，用于fallback快速查找
 	serverList []struct {
 		Port   string
 		Server string
@@ -44,11 +46,12 @@ type Probe struct {
 
 // ProbesMatches 规则结构
 type ProbesMatches struct {
-	IsSoft      bool   //是否为软规则
-	Service     string // 服务名
-	Pattern     string // 匹配正则
-	PatternFlag string //目前opts支持“i”，代表的含义是匹配不区分大小写；“s”：代表在‘.’字符后面有新行
-	VersionInfo Version
+	IsSoft          bool           //是否为软规则
+	Service         string         // 服务名
+	Pattern         string         // 匹配正则
+	PatternFlag     string         //目前opts支持"i"，代表的含义是匹配不区分大小写；"s"：代表在’.’字符后面有新行
+	CompiledPattern *regexp.Regexp // 预编译的正则表达式
+	VersionInfo     Version
 }
 
 // Version 版本信息结构
@@ -96,6 +99,13 @@ type AppFinger struct {
 	Version  Version
 	WebApp   WebApp
 }
+
+// 预编译parseItemHelper中的固定正则，避免每次调用都重新编译
+var (
+	regPFunc  = regexp.MustCompile(`\$P\((\d)\)`)
+	regSubst  = regexp.MustCompile(`\$SUBST\((\d),"([^"]*)","([^"]*)"\)`)
+	regDollar = regexp.MustCompile(`\$(\d)`)
+)
 
 func (init *InitProbe) initNmap() {
 	//解析探针
@@ -171,10 +181,22 @@ func (init *InitProbe) initNmap() {
 	init.addProbe("SMBProgNeg", `match postgresql m|Munsupported frontend protocol| p/PostgreSQL DB/ v/13.x / cpe:/a:postgresql:postgresql:13/`)
 	init.addProbe("SMBProgNeg", `match postgresql m|pginstaller_13.auto| p/PostgreSQL DB/ v/13.x / cpe:/a:postgresql:postgresql:13/`)
 	init.addProbe("TerminalServerCookie", `match ms-wbt-server m|^\x03\0\0\x13\x0e\xd0\0\0\x124\0\x02.*\0\x02\0\0\0| p/Microsoft Terminal Services/ o/Windows/ cpe:/o:microsoft:windows/a`)
+
+	//预编译所有match规则的正则表达式，并构建探针名索引
+	init.probeMap = make(map[string]*Probe, len(init.probeList))
+	for i := range init.probeList {
+		init.probeMap[init.probeList[i].ProbeName] = &init.probeList[i]
+		for j := range init.probeList[i].Matches {
+			init.probeList[i].Matches[j].CompiledPattern = init.getPatternRegexp(
+				init.probeList[i].Matches[j].Pattern,
+				init.probeList[i].Matches[j].PatternFlag,
+			)
+		}
+	}
 }
 
 // regxResponse 解析响应
-func (init *InitProbe) regxResponse(ip string, port int, probe Probe, ssl bool) (finger *AppFinger) {
+func (init *InitProbe) regxResponse(ctx context.Context, ip string, port int, probe Probe, ssl bool) (finger *AppFinger) {
 
 	var (
 		err      error
@@ -185,19 +207,41 @@ func (init *InitProbe) regxResponse(ip string, port int, probe Probe, ssl bool) 
 		probe.TotalWaitMS = 5000
 	}
 	if probe.TcpWrappedMS == 0 {
-		probe.TcpWrappedMS = 10
+		probe.TcpWrappedMS = 3000
 	}
 
+	//取探针超时和ctx剩余时间的较小值，确保不超过总超时
+	probeDuration := time.Duration(probe.TotalWaitMS) * time.Millisecond
+	if deadline, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(deadline); remaining < probeDuration {
+			if remaining <= 0 {
+				return
+			}
+			probeDuration = remaining
+		}
+	}
+
+	addr := net.JoinHostPort(ip, strconv.Itoa(port))
+
 	if ssl {
-		response, err = tlsSend(probe.Protocol, net.JoinHostPort(ip, strconv.Itoa(port)), probe.ProbeString, time.Duration(probe.TotalWaitMS)*time.Millisecond)
+		response, err = netUtils.TlsSend(probe.Protocol, addr, probe.ProbeString, probeDuration)
 	} else {
-		response, err = tcpSend(probe.Protocol, net.JoinHostPort(ip, strconv.Itoa(port)), probe.ProbeString, time.Duration(probe.TotalWaitMS)*time.Millisecond)
+		response, err = netUtils.TcpSend(probe.Protocol, addr, probe.ProbeString, probeDuration)
+	}
+
+	// NULL探针的tcpwrapped检测：连接后不发数据，如果服务在tcpwrappedms内关闭连接且无数据返回，标记为tcpwrapped
+	if probe.ProbeName == "NULL" && !ssl && err != nil && response == nil {
+		if isTcpWrapped(addr, time.Duration(probe.TcpWrappedMS)*time.Millisecond) {
+			return &AppFinger{Service: "tcpwrapped"}
+		}
 	}
 
 	if err != nil || response == nil {
 		return
 	}
 
+	//转义response，只计算一次
+	data := arr.ConvResponse(response)
 	// 循环匹配该协议中的正则表达式
 	for _, item := range probe.Matches {
 
@@ -205,17 +249,15 @@ func (init *InitProbe) regxResponse(ip string, port int, probe Probe, ssl bool) 
 		if finger != nil && finger.Service != item.Service {
 			continue
 		}
-		//转义response
-		data := arr.ConvResponse(response)
-		//进行硬匹配和软匹配
-		if reg := init.getPatternRegexp(item.Pattern, item.PatternFlag); reg != nil && reg.MatchString(data) {
+		//使用预编译的正则进行硬匹配和软匹配
+		if reg := item.CompiledPattern; reg != nil && reg.MatchString(data) {
 			if finger == nil {
 				finger = &AppFinger{}
 				finger.Service = item.Service
 			}
 			finger.Response = response
 			//解析版本
-			item.parseVersionInfo(data, &finger.Version, reg.String())
+			item.parseVersionInfo(data, &finger.Version, reg)
 			//软匹配，继续下一个
 			if item.IsSoft {
 				continue
@@ -225,26 +267,21 @@ func (init *InitProbe) regxResponse(ip string, port int, probe Probe, ssl bool) 
 	}
 
 	//匹配空探针的规则
-	for _, item := range init.probeList {
-		if item.ProbeName != "NULL" {
-			continue
-		}
-		for _, subItem := range item.Matches {
+	if nullProbe, ok := init.probeMap["NULL"]; ok {
+		for _, subItem := range nullProbe.Matches {
 			//如果不等于空说明是soft，此时只排查相同服务的探针
 			if finger != nil && finger.Service != subItem.Service {
 				continue
 			}
-			//转义response
-			data := arr.ConvResponse(response)
-			//进行硬匹配和软匹配
-			if reg := init.getPatternRegexp(subItem.Pattern, subItem.PatternFlag); reg != nil && reg.MatchString(data) {
+			//使用预编译的正则进行硬匹配和软匹配
+			if reg := subItem.CompiledPattern; reg != nil && reg.MatchString(data) {
 				if finger == nil {
 					finger = &AppFinger{}
 					finger.Service = subItem.Service
 				}
 				finger.Response = response
 				//解析版本
-				subItem.parseVersionInfo(data, &finger.Version, reg.String())
+				subItem.parseVersionInfo(data, &finger.Version, reg)
 				//软匹配，继续下一个
 				if subItem.IsSoft {
 					continue
@@ -252,41 +289,37 @@ func (init *InitProbe) regxResponse(ip string, port int, probe Probe, ssl bool) 
 				return finger
 			}
 		}
-
 	}
 
-	//此可选指令指定在当前“探测器”部分中没有匹配项时应将哪些探测器用作回退。
+	//此可选指令指定在当前"探测器"部分中没有匹配项时应将哪些探测器用作回退。
 	//对于没有回退指令的 TCP 探测器，Nmap 首先尝试探测本身中的匹配行，然后执行到 NULL 探测器的隐式回退。
 	//如果存在回退指令，Nmap 首先尝试匹配探测器本身的行，然后尝试匹配回退指令中指定的探测器中的行（从左到右）。
 	//最后，Nmap 将尝试空探测。对于 UDP，行为是相同的，只是从不尝试 NULL 探测。
 	for _, fallback := range probe.Fallback {
-		for _, fallbackProbe := range init.probeList {
-			if fallbackProbe.ProbeName != fallback {
+		fallbackProbe, ok := init.probeMap[fallback]
+		if !ok {
+			continue
+		}
+		// 循环匹配该协议中的正则表达式
+		for _, item := range fallbackProbe.Matches {
+			//如果不等于空说明是soft，此时只排查相同服务的探针
+			if finger != nil && finger.Service != item.Service {
 				continue
 			}
-			// 循环匹配该协议中的正则表达式
-			for _, item := range fallbackProbe.Matches {
-				//如果不等于空说明是soft，此时只排查相同服务的探针
-				if finger != nil && finger.Service != item.Service {
+			//使用预编译的正则进行硬匹配和软匹配
+			if reg := item.CompiledPattern; reg != nil && reg.MatchString(data) {
+				if finger == nil {
+					finger = &AppFinger{}
+					finger.Service = item.Service
+				}
+				finger.Response = response
+				//解析版本
+				item.parseVersionInfo(data, &finger.Version, reg)
+				//软匹配，继续下一个
+				if item.IsSoft {
 					continue
 				}
-				//转义response
-				data := arr.ConvResponse(response)
-				//进行硬匹配和软匹配
-				if reg := init.getPatternRegexp(item.Pattern, item.PatternFlag); reg != nil && reg.MatchString(data) {
-					if finger == nil {
-						finger = &AppFinger{}
-						finger.Service = item.Service
-					}
-					finger.Response = response
-					//解析版本
-					item.parseVersionInfo(data, &finger.Version, reg.String())
-					//软匹配，继续下一个
-					if item.IsSoft {
-						continue
-					}
-					return finger
-				}
+				return finger
 			}
 		}
 	}
@@ -473,34 +506,45 @@ func (init *InitProbe) parsePort(slice []string) {
 }
 
 // parseVersionInfo 解析版本信息
-func (m *ProbesMatches) parseVersionInfo(s string, f *Version, pattern string) {
-	f.Version = m.parseItemHelper(s, m.VersionInfo.Version, pattern)
-	f.Info = m.parseItemHelper(s, m.VersionInfo.Info, pattern)
-	f.DeviceType = m.parseItemHelper(s, m.VersionInfo.DeviceType, pattern)
-	f.Hostname = m.parseItemHelper(s, m.VersionInfo.Hostname, pattern)
-	f.OperatingSystem = m.parseItemHelper(s, m.VersionInfo.OperatingSystem, pattern)
-	f.VendorProductName = m.parseItemHelper(s, m.VersionInfo.VendorProductName, pattern)
+func (m *ProbesMatches) parseVersionInfo(s string, f *Version, reg *regexp.Regexp) {
+	f.Version = m.parseItemHelper(s, m.VersionInfo.Version, reg)
+	f.Info = m.parseItemHelper(s, m.VersionInfo.Info, reg)
+	f.DeviceType = m.parseItemHelper(s, m.VersionInfo.DeviceType, reg)
+	f.Hostname = m.parseItemHelper(s, m.VersionInfo.Hostname, reg)
+	f.OperatingSystem = m.parseItemHelper(s, m.VersionInfo.OperatingSystem, reg)
+	f.VendorProductName = m.parseItemHelper(s, m.VersionInfo.VendorProductName, reg)
 }
 
 // parseItemHelper 解析version信息
-func (m *ProbesMatches) parseItemHelper(s string, pattern string, ss string) string {
-
-	reg := regexp.MustCompile(ss)
+func (m *ProbesMatches) parseItemHelper(s string, pattern string, reg *regexp.Regexp) string {
 
 	if len(reg.FindStringSubmatch(s)) == 1 || pattern == "" {
 		return pattern
 	}
 
-	if subReg := regexp.MustCompile(`\$P\((\d)\)`); subReg.MatchString(pattern) {
-		pattern = subReg.ReplaceAllStringFunc(pattern, func(repl string) string {
-			a := subReg.FindStringSubmatch(repl)[1]
+	if regPFunc.MatchString(pattern) {
+		pattern = regPFunc.ReplaceAllStringFunc(pattern, func(repl string) string {
+			a := regPFunc.FindStringSubmatch(repl)[1]
 			return "$" + a
 		})
 	}
 
-	if subReg := regexp.MustCompile(`\$(\d)`); subReg.MatchString(pattern) {
-		pattern = subReg.ReplaceAllStringFunc(pattern, func(repl string) string {
-			i, _ := strconv.Atoi(subReg.FindStringSubmatch(repl)[1])
+	// 处理$SUBST(n,"find","replace")：将捕获组n中的find替换为replace
+	if regSubst.MatchString(pattern) {
+		pattern = regSubst.ReplaceAllStringFunc(pattern, func(repl string) string {
+			parts := regSubst.FindStringSubmatch(repl)
+			groupIdx, _ := strconv.Atoi(parts[1])
+			submatches := reg.FindStringSubmatch(s)
+			if groupIdx < len(submatches) {
+				return strings.ReplaceAll(submatches[groupIdx], parts[2], parts[3])
+			}
+			return repl
+		})
+	}
+
+	if regDollar.MatchString(pattern) {
+		pattern = regDollar.ReplaceAllStringFunc(pattern, func(repl string) string {
+			i, _ := strconv.Atoi(regDollar.FindStringSubmatch(repl)[1])
 			return reg.FindStringSubmatch(s)[i]
 		})
 	}
@@ -600,95 +644,6 @@ func rangeVersion(s string) (versionInfo Version) {
 	return
 }
 
-func tlsSend(protocol string, ip string, data []byte, duration time.Duration) (response []byte, err error) {
-
-	conn, err := net.DialTimeout(strings.ToLower(protocol), ip, duration)
-	if err != nil {
-		return nil, err
-	}
-
-	defer conn.Close()
-
-	tlsConn := tls.Client(conn, &tls.Config{
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionTLS10,
-		CurvePreferences: []tls.CurveID{
-			tls.CurveP256,
-			tls.CurveP384,
-			tls.CurveP521,
-			tls.X25519,
-		},
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-
-			// Kept for backwards compatibility with some clients
-			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-		},
-	})
-
-	//设置读取超时Deadline
-	_ = tlsConn.SetDeadline(time.Now().Add(duration))
-
-	_, err = tlsConn.Write(data)
-	if err != nil {
-		return nil, err
-	}
-	for {
-		buff := make([]byte, 4096)
-		n, err := tlsConn.Read(buff)
-		if err != nil {
-			if len(response) > 0 {
-				break
-			}
-			return nil, err
-		}
-		if n > 0 {
-			response = append(response, buff[:n]...)
-		}
-	}
-	return response, nil
-}
-
-func tcpSend(protocol string, ip string, data []byte, duration time.Duration) (response []byte, err error) {
-	conn, err := net.DialTimeout(strings.ToLower(protocol), ip, duration)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	//设置读取超时Deadline
-	_ = conn.SetDeadline(time.Now().Add(duration))
-
-	// 发送指纹探测数据
-	_, err = conn.Write(data)
-	if err != nil {
-		return nil, err
-	}
-
-	//等待回复时长
-	for {
-		buff := make([]byte, 4096)
-		n, err := conn.Read(buff)
-		if err != nil {
-			if len(response) > 0 {
-				break
-			}
-			return nil, err
-		}
-		if n > 0 {
-			response = append(response, buff[:n]...)
-			break
-		}
-	}
-	return response, nil
-}
-
 // WebFinger 运行web指纹枚举
 func (init *InitProbe) webFinger(target string, timeout time.Duration) *WebApp {
 
@@ -696,7 +651,7 @@ func (init *InitProbe) webFinger(target string, timeout time.Duration) *WebApp {
 
 	req.AddCookie(&http.Cookie{Name: "rememberMe", Value: randomUtils.RandomString(5)})
 
-	response, err := netUtils.SendHttp(req, timeout, true)
+	response, err := netUtils.SendHttp(req, timeout)
 	if err != nil {
 		return nil
 	}
@@ -795,4 +750,30 @@ func (init *InitProbe) webFinger(target string, timeout time.Duration) *WebApp {
 		res.Icon = scr.Icon
 	}
 	return &res
+}
+
+// isTcpWrapped 检测端口是否为tcpwrapped
+// 连接目标端口后不发送数据，如果在指定时间内连接被关闭且无数据返回，则判定为tcpwrapped
+func isTcpWrapped(addr string, timeout time.Duration) bool {
+	conn, err := net.DialTimeout("tcp", addr, timeout)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+
+	buf := make([]byte, 1)
+	_, err = conn.Read(buf)
+	if err != nil {
+		// 连接在超时内被对方关闭，判定为tcpwrapped
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			// 超时了说明连接没关闭，不是tcpwrapped
+			return false
+		}
+		// 非超时错误（EOF/connection reset），说明被快速关闭
+		return true
+	}
+	// 收到了数据，不是tcpwrapped
+	return false
 }
