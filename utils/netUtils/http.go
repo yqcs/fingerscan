@@ -84,13 +84,14 @@ func SendHttp(request *http.Request, timeout time.Duration) (result Result, err 
 
 	result.Other, err = client.Do(request)
 	if err != nil {
-		errStr := err.Error()
+
+		//errStr := err.Error()
 		// 使用更精确的错误类型检测，避免字符串匹配的误判
-		if isTLSError(errStr) {
-			gmcClient := newGMClient()
-			gmcClient.Timeout = timeout
-			result.Other, err = gmcClient.Do(request)
-		}
+		//if isTLSError(errStr) {
+		//gmcClient := newGMClient()
+		//gmcClient.Timeout = timeout
+		//result.Other, err = gmcClient.Do(request)
+		//}
 		return result, err
 	}
 
