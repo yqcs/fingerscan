@@ -14,6 +14,27 @@ func init() {
 	fingerscan.InitFinger()
 }
 func main() {
+
+	//request, err := http.NewRequest("GET", "https://60.172.145.140:444", nil)
+	//if err != nil {
+	//	return
+	//}
+	//request.Header.Add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+	//sendHttp, err := netUtils.SendHttp(request, 20*time.Second)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+	//fmt.Println(string(sendHttp.Body))
+
+	//send, err := netUtils.TcpSend("tcp", "qq.com:443", []byte("GET / HTTP/1.1\r\nHost: qq.com:443\r\nConnection: close\r\n\r\n"), 20*time.Second)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+	//fmt.Println(string(send))
+	//
+	//return
 	if len(os.Args) < 3 {
 		fmt.Println("example: fingerscan 127.0.0.1 22")
 		return

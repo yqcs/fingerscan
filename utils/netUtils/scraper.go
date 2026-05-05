@@ -2,15 +2,14 @@ package netUtils
 
 import (
 	"bytes"
-	"encoding/base64"
-	"golang.org/x/text/encoding/charmap"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 	"io"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 
 	"golang.org/x/net/html"
 )
@@ -22,80 +21,86 @@ type DocumentPreview struct {
 }
 
 func parseDocument(body []byte) (doc DocumentPreview) {
-
-	// 初始化变量来保存标题和图标地址
-	tokenizer := html.NewTokenizer(strings.NewReader(string(body)))
+	tokenizer := html.NewTokenizer(bytes.NewReader(body))
 
 	for {
-		tokenType := tokenizer.Next()
+		tt := tokenizer.Next()
 
-		switch tokenType {
+		switch tt {
 		case html.ErrorToken:
 			return doc
-		case html.SelfClosingTagToken, html.StartTagToken:
-			token := tokenizer.Token()
 
-			if token.Data == "link" {
-				rel := ""
-				href := ""
+		case html.StartTagToken, html.SelfClosingTagToken:
+			token := tokenizer.Token()
+			tag := strings.ToLower(token.Data)
+
+			if tag == "link" {
+				var rel, href string
 				for _, attr := range token.Attr {
-					if attr.Key == "rel" {
-						rel = attr.Val
+					k := strings.ToLower(attr.Key)
+					if k == "rel" {
+						rel = strings.ToLower(attr.Val)
 					}
-					if attr.Key == "href" {
+					if k == "href" {
 						href = attr.Val
 					}
 				}
 				if strings.Contains(rel, "icon") && doc.iconPath == "" {
 					doc.iconPath = href
 				}
-			} else if token.Data == "title" {
+			}
+
+			if tag == "title" && doc.Title == "" {
 				if tokenizer.Next() == html.TextToken {
-					doc.Title = strings.ReplaceAll(tokenizer.Token().Data, "  ", "")
-					doc.Title = strings.ReplaceAll(doc.Title, "\r", "")
-					doc.Title = strings.ReplaceAll(doc.Title, "\n", "")
+					doc.Title = strings.TrimSpace(tokenizer.Token().Data)
 				}
+			}
+
+			// 提前结束
+			if doc.Title != "" && doc.iconPath != "" {
+				return doc
 			}
 		}
 	}
 }
 
 func Scrape(resp Result, timeout time.Duration) *DocumentPreview {
+	//暂不提取ico了
 	doc := parseDocument(resp.Body)
-	if doc == (DocumentPreview{}) {
-		return nil
-	}
-	url := resp.Other.Request.URL.Scheme + "://" + resp.Other.Request.URL.Host + doc.iconPath
-	//如果是独立地址
-	if strings.HasPrefix(doc.iconPath, "http") {
-		url = doc.iconPath
-	} else if strings.HasPrefix(doc.iconPath, "//") {
-		//如果是//exp.com地址
-		url = resp.Other.Request.URL.Scheme + ":" + doc.iconPath
-	} else if !strings.HasPrefix(doc.iconPath, "/") {
-		// 如果是img.ico 则使用这种拼接
-		url = resp.Other.Request.URL.Scheme + "://" + resp.Other.Request.URL.Host + "/" + doc.iconPath
-	}
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return &doc
-	}
-	sendHttp, err := SendHttp(request, timeout)
-	if err != nil {
-		return &doc
-	}
-	if sendHttp.Other.Body != nil {
-		sendHttp.Other.Body.Close()
-	}
-	if sendHttp.Other.StatusCode != http.StatusOK {
-		return &doc
-	}
-	iconType := http.DetectContentType(sendHttp.Body)
-	if strings.HasSuffix(doc.iconPath, ".svg") {
-		doc.Icon = "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString(sendHttp.Body)
-	} else if strings.Contains(iconType, "image/") {
-		doc.Icon = "data:" + iconType + ";base64," + base64.StdEncoding.EncodeToString(sendHttp.Body)
-	}
+	//if doc == (DocumentPreview{}) {
+	//	return nil
+	//}
+	//url := resp.Other.Request.URL.Scheme + "://" + resp.Other.Request.URL.Host + doc.iconPath
+	////如果是独立地址
+	//if strings.HasPrefix(doc.iconPath, "http") {
+	//	url = doc.iconPath
+	//} else if strings.HasPrefix(doc.iconPath, "//") {
+	//	//如果是//exp.com地址
+	//	url = resp.Other.Request.URL.Scheme + ":" + doc.iconPath
+	//} else if !strings.HasPrefix(doc.iconPath, "/") {
+	//	// 如果是img.ico 则使用这种拼接
+	//	url = resp.Other.Request.URL.Scheme + "://" + resp.Other.Request.URL.Host + "/" + doc.iconPath
+	//}
+	//request, err := http.NewRequest("GET", url, nil)
+	//if err != nil {
+	//	return &doc
+	//}
+	//sendHttp, err := SendHttp(request, timeout)
+	//if err != nil {
+	//	return &doc
+	//}
+	//if sendHttp.Other.Body != nil {
+	//	sendHttp.Other.Body.Close()
+	//}
+	//if sendHttp.Other.StatusCode != http.StatusOK {
+	//	return &doc
+	//}
+	//iconType := http.DetectContentType(sendHttp.Body)
+	//if strings.HasSuffix(doc.iconPath, ".svg") {
+	//	doc.Icon = "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString(sendHttp.Body)
+	//} else if strings.Contains(iconType, "image/") {
+	//	doc.Icon = "data:" + iconType + ";base64," + base64.StdEncoding.EncodeToString(sendHttp.Body)
+	//}
 	return &doc
 }
 

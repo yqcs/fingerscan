@@ -1,7 +1,7 @@
 package netUtils
 
 import (
-	"crypto/tls"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -9,83 +9,27 @@ import (
 	"github.com/tjfoc/gmsm/gmtls"
 )
 
-// newGMTLSConn 创建国密TLS连接（必须新建TCP连接，不能复用标准TLS失败后的脏连接）
-func newGMTLSConn(protocol string, ip string, duration time.Duration) (net.Conn, error) {
-	conn, err := net.DialTimeout(strings.ToLower(protocol), ip, duration)
-	if err != nil {
-		return nil, err
-	}
-	tlsConn := gmtls.Client(conn, &gmtls.Config{
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionTLS10,
-		CurvePreferences: []gmtls.CurveID{
-			gmtls.CurveP256,
-			gmtls.CurveP384,
-			gmtls.CurveP521,
-			gmtls.X25519,
-		},
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-		},
-	})
-	if err = tlsConn.Handshake(); err != nil {
-		conn.Close()
-		return nil, err
-	}
-	return tlsConn, nil
-}
-
 func TlsSend(protocol string, ip string, data []byte, duration time.Duration) (response []byte, err error) {
 
 	conn, err := net.DialTimeout(strings.ToLower(protocol), ip, duration)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
 
-	tlsConn := tls.Client(conn, &tls.Config{
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionTLS10,
-		CurvePreferences: []tls.CurveID{
-			tls.CurveP256,
-			tls.CurveP384,
-			tls.CurveP521,
-			tls.X25519,
-		},
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-		},
+	gmConn := gmtls.Client(conn, &gmtls.Config{
+		InsecureSkipVerify: true, ServerName: "60.172.145.140",
 	})
 
-	_ = tlsConn.SetDeadline(time.Now().Add(duration))
-	response, err = tlsReadWrite(tlsConn, data)
+	_ = gmConn.SetDeadline(time.Now().Add(duration))
 
-	if err != nil && isTLSError(err.Error()) {
-		//标准TLS失败，关闭旧连接，新建国密TLS连接重试
+	err = gmConn.Handshake()
+	if err != nil {
 		conn.Close()
-		gmConn, gmErr := newGMTLSConn(protocol, ip, duration)
-		if gmErr != nil {
-			return nil, err
-		}
-		defer gmConn.Close()
-		_ = gmConn.SetDeadline(time.Now().Add(duration))
-		response, err = tlsReadWrite(gmConn, data)
+		return nil, err
 	}
-	return
+
+	defer gmConn.Close()
+	return tlsReadWrite(gmConn, data)
 }
 
 // tlsReadWrite 通过TLS连接发送数据并读取响应
@@ -94,52 +38,75 @@ func tlsReadWrite(conn net.Conn, data []byte) (response []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	buff := make([]byte, 4096)
+
 	for {
-		buff := make([]byte, 4096)
 		n, err := conn.Read(buff)
-		if err != nil {
-			if len(response) > 0 {
-				break
-			}
-			return nil, err
-		}
+
 		if n > 0 {
 			response = append(response, buff[:n]...)
 		}
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return response, err
+		}
 	}
+
 	return response, nil
 }
 
-func TcpSend(protocol string, ip string, data []byte, duration time.Duration) (response []byte, err error) {
+func TcpSend(protocol string, ip string, data []byte, duration time.Duration) ([]byte, error) {
 	conn, err := net.DialTimeout(strings.ToLower(protocol), ip, duration)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 
-	//设置读取超时Deadline
-	_ = conn.SetDeadline(time.Now().Add(duration))
+	// 写超时
+	_ = conn.SetWriteDeadline(time.Now().Add(duration))
 
-	// 发送指纹探测数据
-	_, err = conn.Write(data)
-	if err != nil {
+	// 发送
+	if _, err = conn.Write(data); err != nil {
 		return nil, err
 	}
 
-	//等待回复时长
+	// 👉 尝试半关闭（对部分协议很关键，比如HTTP/1.0风格）
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		_ = tcpConn.CloseWrite()
+	}
+
+	// 读超时（滚动）
+	buf := make([]byte, 4096)
+	var response []byte
+
 	for {
-		buff := make([]byte, 4096)
-		n, err := conn.Read(buff)
+		_ = conn.SetReadDeadline(time.Now().Add(duration))
+
+		n, err := conn.Read(buf)
+
+		if n > 0 {
+			response = append(response, buf[:n]...)
+		}
+
 		if err != nil {
-			if len(response) > 0 {
+			// 正常结束
+			if err == io.EOF {
 				break
 			}
-			return nil, err
-		}
-		if n > 0 {
-			response = append(response, buff[:n]...)
-			break
+			// 超时：如果已经有数据，就认为读完了
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				if len(response) > 0 {
+					break
+				}
+			}
+
+			return response, err
 		}
 	}
+
 	return response, nil
 }

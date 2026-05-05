@@ -1,17 +1,15 @@
 package netUtils
 
 import (
-	"crypto/tls"
 	"net"
 	"net/http"
 
 	"github.com/saintfish/chardet"
+	"github.com/tjfoc/gmsm/gmtls"
 
 	"net/http/httputil"
 	"strings"
 	"time"
-
-	"github.com/tjfoc/gmsm/gmtls"
 )
 
 // Result 封装的http返回包
@@ -22,55 +20,16 @@ type Result struct {
 	Header     string
 }
 
-var client = http.Client{
+var client = &http.Client{
 	Transport: &http.Transport{
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS10},
+		DialTLS: func(network, addr string) (net.Conn, error) {
+			return gmtls.Dial(network, addr, &gmtls.Config{
+				InsecureSkipVerify: true, // 测试用
+			})
+		},
 		DisableKeepAlives:   true,
 		MaxIdleConnsPerHost: 10, //每个host最大空闲连接
 	},
-}
-
-func newGMClient() *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				conn, err := net.DialTimeout(network, addr, 10*time.Second)
-				if err != nil {
-					return nil, err
-				}
-				config := &gmtls.Config{
-					InsecureSkipVerify: true,
-				}
-				tlsConn := gmtls.Client(conn, config)
-				if err = tlsConn.Handshake(); err != nil {
-					conn.Close()
-					return nil, err
-				}
-				return tlsConn, nil
-			},
-		},
-		Timeout: 30 * time.Second,
-	}
-}
-
-// isTLSError 检查是否为TLS相关错误，提高检测准确性和性能
-func isTLSError(errStr string) bool {
-	// 预编译常见的TLS错误关键词，避免重复字符串匹配
-	tlsErrors := []string{
-		"unsupported elliptic curve",
-		"failed to parse certificate",
-		"certificate verify failed",
-		"handshake failure",
-		"unknown certificate authority",
-		"no supported cipher suite",
-	}
-
-	for _, tlsErr := range tlsErrors {
-		if strings.Contains(errStr, tlsErr) {
-			return true
-		}
-	}
-	return false
 }
 
 // SendHttp 自定义Http包，redirect默认为true
@@ -84,14 +43,6 @@ func SendHttp(request *http.Request, timeout time.Duration) (result Result, err 
 
 	result.Other, err = client.Do(request)
 	if err != nil {
-
-		//errStr := err.Error()
-		// 使用更精确的错误类型检测，避免字符串匹配的误判
-		//if isTLSError(errStr) {
-		//gmcClient := newGMClient()
-		//gmcClient.Timeout = timeout
-		//result.Other, err = gmcClient.Do(request)
-		//}
 		return result, err
 	}
 
