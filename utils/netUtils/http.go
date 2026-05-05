@@ -1,11 +1,13 @@
 package netUtils
 
 import (
+	"context"
+	"crypto/tls"
 	"net"
 	"net/http"
 
+	"github.com/hxx258456/ccgo/gmtls"
 	"github.com/saintfish/chardet"
-	"github.com/tjfoc/gmsm/gmtls"
 
 	"net/http/httputil"
 	"strings"
@@ -22,12 +24,10 @@ type Result struct {
 
 var client = &http.Client{
 	Transport: &http.Transport{
-		DialTLS: func(network, addr string) (net.Conn, error) {
-			return gmtls.Dial(network, addr, &gmtls.Config{
-				InsecureSkipVerify: true, // 测试用
-			})
+		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return gmtls.Dial(network, addr, &gmtls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS10, MaxVersion: tls.VersionTLS13})
 		},
-		DisableKeepAlives:   true,
+		DisableKeepAlives:   false,
 		MaxIdleConnsPerHost: 10, //每个host最大空闲连接
 	},
 }
