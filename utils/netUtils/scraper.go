@@ -5,7 +5,6 @@ import (
 	"io"
 	"regexp"
 	"strings"
-	"time"
 
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/encoding/simplifiedchinese"
@@ -64,7 +63,7 @@ func parseDocument(body []byte) (doc DocumentPreview) {
 	}
 }
 
-func Scrape(resp Result, timeout time.Duration) *DocumentPreview {
+func Scrape(resp Result) *DocumentPreview {
 	//暂不提取ico了
 	doc := parseDocument(resp.Body)
 	//if doc == (DocumentPreview{}) {

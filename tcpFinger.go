@@ -224,9 +224,9 @@ func (init *InitProbe) regxResponse(ctx context.Context, ip string, port int, pr
 	addr := net.JoinHostPort(ip, strconv.Itoa(port))
 
 	if ssl {
-		response, err = netUtils.TlsSend(probe.Protocol, addr, probe.ProbeString, probeDuration)
+		response, err = netUtils.Send("ssl", addr, probe.ProbeString, probeDuration)
 	} else {
-		response, err = netUtils.TcpSend(probe.Protocol, addr, probe.ProbeString, probeDuration)
+		response, err = netUtils.Send(probe.Protocol, addr, probe.ProbeString, probeDuration)
 	}
 
 	// NULL探针的tcpwrapped检测：连接后不发数据，如果服务在tcpwrappedms内关闭连接且无数据返回，标记为tcpwrapped
@@ -743,7 +743,7 @@ func (init *InitProbe) webFinger(target string, timeout time.Duration) *WebApp {
 	}
 
 	//获取ICON和Title
-	if scr := netUtils.Scrape(response, timeout); scr != nil {
+	if scr := netUtils.Scrape(response); scr != nil {
 		res.Title = strings.ReplaceAll(scr.Title, "\r", " ")
 		res.Title = strings.ReplaceAll(scr.Title, "\n", " ")
 		res.Title = strings.ReplaceAll(scr.Title, "  ", " ")

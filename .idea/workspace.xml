@@ -4,10 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="25f06f9e-a885-4965-a1a9-d3cd3c602488" name="更改" comment="移除 gsm">
+    <list default="true" id="25f06f9e-a885-4965-a1a9-d3cd3c602488" name="更改" comment="修复gm">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/netUtils/http.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils/netUtils/http.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tcpFinger.go" beforeDir="false" afterPath="$PROJECT_DIR$/tcpFinger.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/utils/netUtils/scraper.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils/netUtils/scraper.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/utils/netUtils/tcp.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils/netUtils/tcp.go" afterDir="false" />
     </list>
@@ -74,6 +74,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "http.proxy",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -146,7 +147,11 @@
       <workItem from="1773641633390" duration="16491000" />
       <workItem from="1777533460714" duration="171000" />
       <workItem from="1777536400430" duration="850000" />
-      <workItem from="1777974415946" duration="6846000" />
+      <workItem from="1777974415946" duration="7061000" />
+      <workItem from="1777982225697" duration="328000" />
+      <workItem from="1777982562557" duration="35000" />
+      <workItem from="1777982630224" duration="14000" />
+      <workItem from="1777983739302" duration="1478000" />
     </task>
     <task id="LOCAL-00001" summary="Remove project name">
       <option name="closed" value="true" />
@@ -180,7 +185,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777536504072</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="修复gm">
+      <option name="closed" value="true" />
+      <created>1777981334111</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1777981334111</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -190,6 +203,18 @@
     <MESSAGE value="Remove project name" />
     <MESSAGE value="优化性能" />
     <MESSAGE value="移除 gsm" />
-    <option name="LAST_COMMIT_MESSAGE" value="移除 gsm" />
+    <MESSAGE value="修复gm" />
+    <option name="LAST_COMMIT_MESSAGE" value="修复gm" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/tcpFinger.go</url>
+          <line>681</line>
+          <option name="timeStamp" value="10" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

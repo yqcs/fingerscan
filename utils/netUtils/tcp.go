@@ -9,39 +9,29 @@ import (
 	"github.com/tjfoc/gmsm/gmtls"
 )
 
-func TlsSend(protocol string, ip string, data []byte, duration time.Duration) (response []byte, err error) {
+func TlsSend(addr string, data []byte, duration time.Duration) ([]byte, error) {
 
-	conn, err := net.DialTimeout(strings.ToLower(protocol), ip, duration)
+	cfg := &gmtls.Config{InsecureSkipVerify: true}
+
+	conn, err := gmtls.Dial("tcp", addr, cfg)
 	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
 
-	gmConn := gmtls.Client(conn, &gmtls.Config{
-		InsecureSkipVerify: true, ServerName: "60.172.145.140",
-	})
+	_ = conn.SetDeadline(time.Now().Add(duration))
 
-	_ = gmConn.SetDeadline(time.Now().Add(duration))
-
-	err = gmConn.Handshake()
-	if err != nil {
-		conn.Close()
+	// ===== write =====
+	if _, err = conn.Write(data); err != nil {
 		return nil, err
 	}
 
-	defer gmConn.Close()
-	return tlsReadWrite(gmConn, data)
-}
-
-// tlsReadWrite 通过TLS连接发送数据并读取响应
-func tlsReadWrite(conn net.Conn, data []byte) (response []byte, err error) {
-	_, err = conn.Write(data)
-	if err != nil {
-		return nil, err
-	}
-
+	// ===== read =====
 	buff := make([]byte, 4096)
+	var response []byte
 
 	for {
+		_ = conn.SetReadDeadline(time.Now().Add(duration))
 		n, err := conn.Read(buff)
 
 		if n > 0 {
@@ -52,6 +42,14 @@ func tlsReadWrite(conn net.Conn, data []byte) (response []byte, err error) {
 			if err == io.EOF {
 				break
 			}
+
+			// 超时但已有数据 → 直接返回
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				if len(response) > 0 {
+					break
+				}
+			}
+
 			return response, err
 		}
 	}
@@ -74,18 +72,12 @@ func TcpSend(protocol string, ip string, data []byte, duration time.Duration) ([
 		return nil, err
 	}
 
-	// 👉 尝试半关闭（对部分协议很关键，比如HTTP/1.0风格）
-	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		_ = tcpConn.CloseWrite()
-	}
-
 	// 读超时（滚动）
 	buf := make([]byte, 4096)
 	var response []byte
 
 	for {
 		_ = conn.SetReadDeadline(time.Now().Add(duration))
-
 		n, err := conn.Read(buf)
 
 		if n > 0 {
@@ -98,6 +90,65 @@ func TcpSend(protocol string, ip string, data []byte, duration time.Duration) ([
 				break
 			}
 			// 超时：如果已经有数据，就认为读完了
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				if len(response) > 0 {
+					break
+				}
+			}
+
+			return response, err
+		}
+	}
+
+	return response, nil
+}
+
+func Send(protocol string, addr string, data []byte, duration time.Duration) ([]byte, error) {
+
+	protocol = strings.ToLower(protocol)
+
+	var conn net.Conn
+	var err error
+
+	// ===== 1. 建立连接层 =====
+	if protocol == "ssl" {
+		conn, err = gmtls.Dial("tcp", addr, &gmtls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		conn, err = net.DialTimeout(protocol, addr, duration)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	defer conn.Close()
+
+	_ = conn.SetDeadline(time.Now().Add(duration))
+
+	// ===== 2. write =====
+	if _, err = conn.Write(data); err != nil {
+		return nil, err
+	}
+
+	// ===== 3. read =====
+	buf := make([]byte, 4096)
+	var response []byte
+
+	for {
+		_ = conn.SetReadDeadline(time.Now().Add(duration))
+		n, err := conn.Read(buf)
+
+		if n > 0 {
+			response = append(response, buf[:n]...)
+		}
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
 				if len(response) > 0 {
 					break

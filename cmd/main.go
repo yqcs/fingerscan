@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yqcs/fingerscan"
+	"github.com/yqcs/fingerscan/utils/netUtils"
 )
 
 func init() {
@@ -27,14 +28,14 @@ func main() {
 	//}
 	//fmt.Println(string(sendHttp.Body))
 
-	//send, err := netUtils.TcpSend("tcp", "qq.com:443", []byte("GET / HTTP/1.1\r\nHost: qq.com:443\r\nConnection: close\r\n\r\n"), 20*time.Second)
-	//if err != nil {
-	//	fmt.Println(err)
-	//	return
-	//}
-	//fmt.Println(string(send))
-	//
-	//return
+	send, err := netUtils.Send("tcp", "qq.com:80", []byte("GET / HTTP/1.1\r\nHost: qq.com:80\r\nConnection: close\r\n\r\n"), 20*time.Second)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(string(send))
+
+	return
 	if len(os.Args) < 3 {
 		fmt.Println("example: fingerscan 127.0.0.1 22")
 		return
